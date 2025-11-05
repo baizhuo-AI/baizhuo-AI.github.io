@@ -165,17 +165,14 @@ async function loadJson(path) {
   // works for GitHub Pages (https) and local previews.
   try {
     const response = await fetch(url.href, { cache: 'no-store' });
+  try {
+    const response = await fetch(url.href);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
     return await response.json();
   } catch (err) {
     if (isFileProtocol) {
-      try {
-        return await loadJsonViaXhr(url);
-      } catch (xhrErr) {
-        console.warn('XHR fallback failed for', path, xhrErr);
-      }
       try {
         const moduleUrl = new URL(path, import.meta.url).href;
         const module = await import(/* @vite-ignore */ moduleUrl, {
@@ -189,35 +186,6 @@ async function loadJson(path) {
     console.error(`Failed to load ${path}`, err);
     throw err;
   }
-}
-
-function loadJsonViaXhr(url) {
-  return new Promise((resolve, reject) => {
-    try {
-      const xhr = new XMLHttpRequest();
-      const target = url.href;
-      xhr.open('GET', target, true);
-      xhr.overrideMimeType('application/json');
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-          const successStatus = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
-          if (!successStatus) {
-            reject(new Error(`XHR status ${xhr.status}`));
-            return;
-          }
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch (parseErr) {
-            reject(parseErr);
-          }
-        }
-      };
-      xhr.onerror = () => reject(new Error('XHR network error'));
-      xhr.send();
-    } catch (err) {
-      reject(err);
-    }
-  });
 }
 
 function loadPrefs() {
