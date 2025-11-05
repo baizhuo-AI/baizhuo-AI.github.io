@@ -16,6 +16,35 @@ This repository hosts a static HTML/CSS/JavaScript application for browsing Larg
 
 Open [`index.html`](index.html) directly in a browser or serve the project with any static web server (e.g. `python -m http.server`). No build step is required.
 
+### Deploying to GitHub Pages
+
+If the GitHub UI displays “This branch has not been deployed”, the repository’s Pages configuration still needs to be enabled. A maintainer can set it up with the following steps:
+
+1. Push the latest code to the remote branch that should be published (for example `work` or `main`).
+2. In the GitHub web UI open **Settings → Pages**.
+3. Under **Build and deployment**, choose **Source → Deploy from a branch** and select the branch (`main` is recommended) with the `/` root folder.
+4. Save the configuration. GitHub will queue an initial deployment; the **Actions** tab shows progress. Once the deployment succeeds, the Pages URL appears at the top of the same settings page.
+
+After the first deployment, every push to the selected branch triggers an automatic rebuild.
+
+### Resolving branch conflicts before merging
+
+When opening a Pull Request, GitHub may warn “This branch has conflicts that must be resolved”. This happens when the target branch (e.g. `main`) has new commits that are not in your working branch.
+
+Resolve the conflict locally:
+
+```bash
+git checkout work               # switch to your feature branch
+git fetch origin                # fetch latest remote refs
+git merge origin/main           # or rebase: git rebase origin/main
+# edit any files shown as conflicted
+git add <resolved-files>
+git commit                      # completes the merge or rebase
+git push                        # update the PR with the resolution
+```
+
+If the branch is rebased instead of merged, use `git push --force-with-lease` for the final step. Once conflicts are cleared, the PR can be merged and the Pages workflow will deploy the combined code.
+
 ## Project structure
 
 ```

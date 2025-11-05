@@ -68,7 +68,8 @@ node data/tools/csv_to_json.mjs data/incoming/your_file.csv
 - **工作流失败**：检查 CSV 编码、列名是否匹配、是否存在空行或单元格内换行。日志会输出具体行号。
 - **价格为 null**：字段包含非数字字符或单位，请确认为纯数值（人民币）。
 - **温度范围异常**：确保使用 `0-2`、`[0-2]`、`[0-2）` 等格式。
-- **GitHub Pages 未更新**：确认工作流成功并推送到默认分支，或手动触发 Pages rebuild。
+- **GitHub Pages 未更新 / 显示 “This branch has not been deployed”**：需要在 **Settings → Pages** 启用部署源。选择要发布的分支（推荐 `main`）以及根目录 `/`，保存后等待首次部署完成。
+- **Pull Request 显示冲突**：本地执行 `git fetch` 后将 `origin/main`（或目标分支）合并/变基进当前分支，解决冲突并重新推送。
 
 ## 回滚
 
