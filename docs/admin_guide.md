@@ -1,4 +1,4 @@
-# Maintainer Guide
+# AI 价格看板维护指引 (Maintainer Guide)
 
 This document explains how to update the official pricing dataset and operate the accompanying GitHub Actions workflow.
 
@@ -70,6 +70,20 @@ node data/tools/csv_to_json.mjs data/incoming/your_file.csv
 - **温度范围异常**：确保使用 `0-2`、`[0-2]`、`[0-2）` 等格式。
 - **GitHub Pages 未更新 / 显示 “This branch has not been deployed”**：需要在 **Settings → Pages** 启用部署源。选择要发布的分支（推荐 `main`）以及根目录 `/`，保存后等待首次部署完成。
 - **Pull Request 显示冲突**：本地执行 `git fetch` 后将 `origin/main`（或目标分支）合并/变基进当前分支，解决冲突并重新推送。
+
+### 冲突处理步骤示例
+
+```bash
+git checkout work               # 切到需要合并的分支
+git fetch origin                # 获取最新远端引用
+git merge origin/main           # 或 git rebase origin/main
+# 打开冲突文件，保留双方需要的改动
+git add <冲突文件>
+git commit                      # 结束 merge/rebase
+git push                        # 推送解决后的结果
+```
+
+若使用变基方式，最后一步需要 `git push --force-with-lease`。完成后重新打开 PR 即可继续合并。
 
 ## 回滚
 

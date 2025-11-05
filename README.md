@@ -1,4 +1,8 @@
-# LLM Pricing Dashboard
+# baizhuo-AI.github.io
+
+AI 价格看板
+
+## LLM Pricing Dashboard
 
 This repository hosts a static HTML/CSS/JavaScript application for browsing Large Language Model pricing data. The app consumes the canonical dataset in [`data/official_pricing.json`](data/official_pricing.json) and persists user preferences locally via `localStorage`.
 
@@ -68,3 +72,7 @@ The “导入测试 / Import test file” action lets operators load CSV or XLSX
 ## Automation
 
 GitHub Actions workflow `update-data.yml` normalizes CSV uploads in `data/incoming/` into `official_pricing.json` using the Node scripts in `data/tools`. See the admin guide for details.
+
+## Testing
+
+The project currently exposes only static assets, so there is no automated test suite. Manual checks (open `index.html`, try major filters, and inspect the browser console) are sufficient when reviewing changes.

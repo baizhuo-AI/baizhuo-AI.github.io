@@ -160,8 +160,11 @@ async function loadJson(path) {
   const isFileProtocol = window.location.protocol === 'file:';
   const url = new URL(path, window.location.href);
 
+  // When the app is opened via file:// the Fetch API may be blocked by the
+  // browser. We try progressively less strict strategies so the same code path
+  // works for GitHub Pages (https) and local previews.
   try {
-    const response = await fetch(url.href);
+    const response = await fetch(url.href, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
