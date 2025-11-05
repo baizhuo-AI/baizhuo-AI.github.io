@@ -1,5 +1,3 @@
-'use strict';
-
 const STORAGE_KEYS = {
   prefs: 'prefs_v1',
   favorites: 'fav_models_v1',
@@ -43,16 +41,6 @@ const state = {
 };
 
 const $ = selector => document.querySelector(selector);
-
-const DISPLAY_FALLBACK = '—';
-
-const normalizeText = value => (typeof value === 'string' ? value : '');
-const normalizeVendor = value => normalizeText(value).trim();
-const safeLower = value => normalizeText(value).toLowerCase();
-const displayText = value => {
-  const trimmed = normalizeText(value).trim();
-  return trimmed || DISPLAY_FALLBACK;
-};
 
 const elements = {
   title: $('#app-title'),
@@ -177,6 +165,8 @@ async function loadJson(path) {
   // works for GitHub Pages (https) and local previews.
   try {
     const response = await fetch(url.href, { cache: 'no-store' });
+  try {
+    const response = await fetch(url.href);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -184,43 +174,18 @@ async function loadJson(path) {
   } catch (err) {
     if (isFileProtocol) {
       try {
-        return await loadJsonViaXhr(url);
-      } catch (xhrErr) {
-        console.warn('XHR fallback failed for', path, xhrErr);
+        const moduleUrl = new URL(path, import.meta.url).href;
+        const module = await import(/* @vite-ignore */ moduleUrl, {
+          assert: { type: 'json' }
+        });
+        return module.default || module;
+      } catch (moduleErr) {
+        console.error('JSON module fallback failed', moduleErr);
       }
     }
     console.error(`Failed to load ${path}`, err);
     throw err;
   }
-}
-
-function loadJsonViaXhr(url) {
-  return new Promise((resolve, reject) => {
-    try {
-      const xhr = new XMLHttpRequest();
-      const target = url.href;
-      xhr.open('GET', target, true);
-      xhr.overrideMimeType('application/json');
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-          const successStatus = xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300);
-          if (!successStatus) {
-            reject(new Error(`XHR status ${xhr.status}`));
-            return;
-          }
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch (parseErr) {
-            reject(parseErr);
-          }
-        }
-      };
-      xhr.onerror = () => reject(new Error('XHR network error'));
-      xhr.send();
-    } catch (err) {
-      reject(err);
-    }
-  });
 }
 
 function loadPrefs() {
@@ -238,11 +203,6 @@ function loadPrefs() {
   state.sortKey = state.prefs.sortKey;
   state.sortDir = state.prefs.sortDir;
   state.currentPage = state.prefs.page || 1;
-  if (Array.isArray(state.prefs.vendorSelections)) {
-    state.prefs.vendorSelections = state.prefs.vendorSelections
-      .map(normalizeVendor)
-      .filter(Boolean);
-  }
   state.vendorSelections = state.prefs.vendorSelections;
 }
 
@@ -434,13 +394,7 @@ function applyToggleState(button, active) {
 
 function renderVendors() {
   const source = state.useImported && Array.isArray(state.importedData) ? state.importedData : state.officialData;
-  const vendors = Array.from(
-    new Set(
-      source
-        .map(item => normalizeVendor(item.vendor))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => safeLower(a).localeCompare(safeLower(b)));
+  const vendors = Array.from(new Set(source.map(item => item.vendor))).sort();
   state.allVendors = vendors;
   renderVendorOptions();
   updateVendorButtonLabel();
@@ -453,12 +407,10 @@ function renderVendorOptions() {
   const filterText = (state.vendorSearch || '').toLowerCase();
   const selections = new Set(state.vendorSelections || []);
   state.allVendors
-    .filter(v => safeLower(v).includes(filterText))
-    .forEach((vendor, idx) => {
-      const slug = (vendor || '').replace(/\s+/g, '-').toLowerCase();
-      const id = `vendor-${slug || idx}`;
+    .filter(v => v.toLowerCase().includes(filterText))
+    .forEach(vendor => {
+      const id = `vendor-${vendor.replace(/[^a-zA-Z0-9]/g, '')}`;
       const label = document.createElement('label');
-      label.className = 'checkbox';
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.value = vendor;
@@ -542,16 +494,15 @@ function handleGlobalClick(event) {
 function applyFilters() {
   const prefs = state.prefs;
   const langDict = state.i18n[state.lang] || state.i18n.zh;
-  const vendorSet = prefs.vendorSelections ? new Set(prefs.vendorSelections.map(normalizeVendor)) : null;
+  const vendorSet = prefs.vendorSelections ? new Set(prefs.vendorSelections) : null;
   const searchTerm = (prefs.search || '').toLowerCase();
   const source = state.useImported && Array.isArray(state.importedData) ? state.importedData : state.officialData;
   state.data = source.filter(item => {
-    const vendorName = normalizeVendor(item.vendor);
-    if (vendorSet && !vendorSet.has(vendorName)) return false;
+    if (vendorSet && !vendorSet.has(item.vendor)) return false;
     if (prefs.onlyFavorites && !state.favorites.has(item.id)) return false;
     if (prefs.onlyCommon && !item.is_common) return false;
     if (searchTerm) {
-      const haystack = `${normalizeText(item.vendor)} ${normalizeText(item.model)}`.toLowerCase();
+      const haystack = `${item.vendor} ${item.model}`.toLowerCase();
       if (!haystack.includes(searchTerm)) return false;
     }
     return true;
@@ -584,9 +535,7 @@ function applyFilters() {
 
 function dictFormat(template, vars) {
   if (!template) return '';
-  return template.replace(/\{(.*?)\}/g, function (_, key) {
-    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : '';
-  });
+  return template.replace(/\{(.*?)\}/g, (_, key) => vars[key] ?? '');
 }
 
 function applySort() {
@@ -597,32 +546,32 @@ function applySort() {
     let bv;
     switch (key) {
       case 'vendor':
-        av = safeLower(a.vendor);
-        bv = safeLower(b.vendor);
+        av = a.vendor.toLowerCase();
+        bv = b.vendor.toLowerCase();
         break;
       case 'model':
-        av = safeLower(a.model);
-        bv = safeLower(b.model);
+        av = a.model.toLowerCase();
+        bv = b.model.toLowerCase();
         break;
       case 'input':
-        av = a.input_per_million != null ? a.input_per_million : Infinity;
-        bv = b.input_per_million != null ? b.input_per_million : Infinity;
+        av = a.input_per_million ?? Infinity;
+        bv = b.input_per_million ?? Infinity;
         break;
       case 'output':
-        av = a.output_per_million != null ? a.output_per_million : Infinity;
-        bv = b.output_per_million != null ? b.output_per_million : Infinity;
+        av = a.output_per_million ?? Infinity;
+        bv = b.output_per_million ?? Infinity;
         break;
       case 'tempDefault':
-        av = a.temp_default != null ? a.temp_default : Infinity;
-        bv = b.temp_default != null ? b.temp_default : Infinity;
+        av = a.temp_default ?? Infinity;
+        bv = b.temp_default ?? Infinity;
         break;
       case 'region':
         av = a.region || '';
         bv = b.region || '';
         break;
       default:
-        av = safeLower(a.vendor);
-        bv = safeLower(b.vendor);
+        av = a.vendor.toLowerCase();
+        bv = b.vendor.toLowerCase();
     }
     if (av < bv) return -1 * dir;
     if (av > bv) return 1 * dir;
@@ -671,14 +620,13 @@ function renderTable(items) {
     star.className = 'favorite-toggle';
     const isFav = state.favorites.has(item.id);
     star.textContent = isFav ? '★' : '☆';
-    const modelLabel = displayText(item.model);
-    star.setAttribute('aria-label', `${dict['table.favorite']} ${modelLabel}`);
+    star.setAttribute('aria-label', `${dict['table.favorite']} ${item.model}`);
     star.addEventListener('click', () => toggleFavorite(item));
     favTd.appendChild(star);
     tr.appendChild(favTd);
 
     const vendorTd = document.createElement('td');
-    vendorTd.textContent = displayText(item.vendor);
+    vendorTd.textContent = item.vendor;
     if (item.is_common) {
       const badge = document.createElement('span');
       badge.className = 'badge';
@@ -689,7 +637,7 @@ function renderTable(items) {
     tr.appendChild(vendorTd);
 
     const modelTd = document.createElement('td');
-    modelTd.textContent = displayText(item.model);
+    modelTd.textContent = item.model;
     tr.appendChild(modelTd);
 
     const inputTd = document.createElement('td');
@@ -713,17 +661,17 @@ function renderTable(items) {
     tr.appendChild(rangeTd);
 
     const defaultTd = document.createElement('td');
-  defaultTd.textContent = item.temp_default != null ? item.temp_default : DISPLAY_FALLBACK;
+    defaultTd.textContent = item.temp_default ?? '—';
     tr.appendChild(defaultTd);
 
     const regionTd = document.createElement('td');
-    regionTd.textContent = displayText(item.region);
+    regionTd.textContent = item.region || '—';
     tr.appendChild(regionTd);
 
     const descTd = document.createElement('td');
     const desc = document.createElement('div');
     desc.className = 'desc';
-    const full = normalizeText(item.desc);
+    const full = item.desc || '';
     if (full.length > 140) {
       const short = full.slice(0, 140) + '…';
       const span = document.createElement('span');
@@ -740,7 +688,7 @@ function renderTable(items) {
       desc.appendChild(document.createElement('br'));
       desc.appendChild(toggle);
     } else {
-      desc.textContent = full || DISPLAY_FALLBACK;
+      desc.textContent = full || '—';
     }
     descTd.appendChild(desc);
     tr.appendChild(descTd);
@@ -759,7 +707,7 @@ function renderTable(items) {
 }
 
 function formatPrice(value) {
-  if (typeof value !== 'number') return DISPLAY_FALLBACK;
+  if (typeof value !== 'number') return '—';
   const rate = Number(state.prefs.rate) || defaultPrefs.rate;
   const currency = state.prefs.currency;
   const unit = state.prefs.unit;
@@ -774,7 +722,7 @@ function formatPrice(value) {
 }
 
 function formatRange(range) {
-  if (!Array.isArray(range) || range.length < 2) return DISPLAY_FALLBACK;
+  if (!Array.isArray(range) || range.length < 2) return '—';
   return `${range[0]} - ${range[1]}`;
 }
 
@@ -799,7 +747,7 @@ function changePage(delta) {
 function openDrawer(item) {
   state.drawerTarget = item;
   const dict = state.i18n[state.lang] || state.i18n.zh;
-  elements.drawerTitle.textContent = `${displayText(item.vendor)} / ${displayText(item.model)}`;
+  elements.drawerTitle.textContent = `${item.vendor} / ${item.model}`;
   elements.commentNickname.value = '';
   elements.commentContent.value = '';
   renderComments();
@@ -812,9 +760,7 @@ function closeDrawer() {
 }
 
 function getCommentKey(item) {
-  const vendorKey = normalizeVendor(item.vendor) || 'unknown-vendor';
-  const modelKey = normalizeText(item.model).trim() || 'unknown-model';
-  return `${COMMENT_PREFIX}${vendorKey}::${modelKey}`;
+  return `${COMMENT_PREFIX}${item.vendor}::${item.model}`;
 }
 
 function getComments(item) {
@@ -909,9 +855,7 @@ function exportComments() {
   if (!target) return;
   const dict = state.i18n[state.lang] || state.i18n.zh;
   const comments = getComments(target);
-  const vendorKey = normalizeVendor(target.vendor) || 'unknown-vendor';
-  const modelKey = normalizeText(target.model).trim() || 'unknown-model';
-  const safeBase = `${vendorKey}-${modelKey}`.replace(/[\\\s/:*?"<>|]/g, '_');
+  const safeBase = `${target.vendor}-${target.model}`.replace(/[\\\s/:*?"<>|]/g, '_');
   const fileName = `${safeBase}-${dict['comment.export.filename']}.json`;
   const blob = new Blob([JSON.stringify(comments, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -937,7 +881,7 @@ function showToast(message) {
 }
 
 function openSettings() {
-  elements.rateInput.value = state.prefs.rate != null ? state.prefs.rate : defaultPrefs.rate;
+  elements.rateInput.value = state.prefs.rate ?? defaultPrefs.rate;
   elements.settingsModal.setAttribute('aria-hidden', 'false');
 }
 
@@ -976,9 +920,7 @@ function closeImportModal() {
 
 async function handleFileImport(event) {
   const dict = state.i18n[state.lang] || state.i18n.zh;
-  const target = event.target || event.srcElement;
-  const files = target && target.files ? target.files : null;
-  const file = files && files.length ? files[0] : null;
+  const file = event.target.files?.[0];
   if (!file) return;
   try {
     const buffer = await file.arrayBuffer();
