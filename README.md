@@ -1,4 +1,8 @@
-# LLM Pricing Dashboard
+# baizhuo-AI.github.io
+
+AI 价格看板
+
+## LLM Pricing Dashboard
 
 This repository hosts a static HTML/CSS/JavaScript application for browsing Large Language Model pricing data. The app consumes the canonical dataset in [`data/official_pricing.json`](data/official_pricing.json) and persists user preferences locally via `localStorage`.
 
