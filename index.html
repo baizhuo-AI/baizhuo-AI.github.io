@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Pricing Dashboard</title>
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232563eb'/%3E%3Ctext x='50%' y='55%' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-size='34' fill='white'%3EL%3C/text%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="top-bar" role="banner">
+      <div class="branding">
+        <h1 id="app-title">LLM Pricing Dashboard</h1>
+      </div>
+      <div class="toolbar" role="toolbar" aria-label="Controls">
+        <label class="input-group">
+          <span class="sr-only">Search</span>
+          <input
+            type="search"
+            id="search-input"
+            aria-label="Search"
+            placeholder="Search vendor or model…"
+            title="Search vendor or model"
+          />
+        </label>
+        <div class="dropdown" id="vendor-filter">
+          <button
+            id="vendor-filter-btn"
+            class="btn"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            title="Filter vendors"
+          >
+            Filter vendors
+          </button>
+          <div class="dropdown-panel" role="menu" aria-hidden="true">
+            <div class="dropdown-header">
+              <input
+                type="search"
+                id="vendor-search"
+                placeholder="Search vendors"
+                aria-label="Search vendors"
+                title="Search vendors"
+              />
+              <div class="dropdown-actions">
+                <button data-action="select-all" class="btn-small" type="button" title="Select all">Select all</button>
+                <button data-action="clear-all" class="btn-small" type="button" title="Clear all">Clear all</button>
+                <button data-action="invert" class="btn-small" type="button" title="Invert">Invert</button>
+              </div>
+            </div>
+            <div class="dropdown-body" id="vendor-options" role="group"></div>
+          </div>
+        </div>
+        <button id="favorites-toggle" class="btn toggle" type="button" aria-pressed="false" title="Favorites only">Favorites only</button>
+        <button id="common-toggle" class="btn toggle" type="button" aria-pressed="false" title="Common models">Common models</button>
+        <div class="segmented">
+          <button id="currency-toggle" class="btn" type="button" title="Currency">Currency</button>
+          <button id="unit-toggle" class="btn" type="button" title="Billing unit">Billing unit</button>
+        </div>
+        <button id="lang-toggle" class="btn" type="button" title="Language">Language</button>
+        <button id="import-btn" class="btn secondary" type="button" title="Import test file">Import test file</button>
+        <button id="settings-btn" class="btn secondary" type="button" aria-haspopup="dialog" title="Settings">Settings</button>
+        <button id="reset-btn" class="btn secondary" type="button" title="Reset preferences">Reset preferences</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="guide" class="guide" role="region" aria-live="polite">
+        <div class="guide-content">
+          <p id="guide-text">Welcome! Official data is bundled. You can import a test file for local preview.</p>
+          <button id="guide-dismiss" class="btn primary" type="button" title="Got it">Got it</button>
+        </div>
+      </section>
+
+      <section class="table-section" aria-live="polite">
+        <div class="table-wrapper" role="region" aria-label="Pricing table">
+          <table id="pricing-table">
+            <thead>
+              <tr>
+                <th data-sort="favorite" aria-sort="none" title="Favorite">⭐</th>
+                <th data-sort="vendor" aria-sort="none">Vendor</th>
+                <th data-sort="model" aria-sort="none">Model</th>
+                <th data-sort="input" aria-sort="none">Input price</th>
+                <th data-sort="output" aria-sort="none">Output price</th>
+                <th data-sort="currency" aria-sort="none">Currency</th>
+                <th data-sort="unit" aria-sort="none">Unit</th>
+                <th>Temp range</th>
+                <th data-sort="tempDefault" aria-sort="none">Default temp</th>
+                <th data-sort="region" aria-sort="none">Region</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state" hidden>No models match the filters</div>
+        </div>
+        <nav class="pagination" aria-label="Pagination">
+          <button id="prev-page" class="btn" type="button" aria-label="Previous page" title="Prev">Prev</button>
+          <span id="pagination-info"></span>
+          <button id="next-page" class="btn" type="button" aria-label="Next page" title="Next">Next</button>
+        </nav>
+      </section>
+    </main>
+  </div>
+
+  <section id="comment-drawer" class="drawer" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="drawer-header">
+      <h2 id="drawer-title">Comments</h2>
+      <button id="drawer-close" class="btn" type="button" aria-label="Close" title="Close">×</button>
+    </div>
+    <div class="drawer-body">
+      <div id="comment-list" class="comment-list"></div>
+      <form id="comment-form" class="comment-form">
+        <h3 id="comment-form-title">Add comment</h3>
+        <label>
+          <span id="comment-nickname-label">Nickname (optional)</span>
+          <input type="text" id="comment-nickname" placeholder="Nickname" title="Nickname (optional)" />
+        </label>
+        <label>
+          <span id="comment-content-label">Comment content</span>
+          <textarea
+            id="comment-content"
+            required
+            placeholder="Comment"
+            title="Comment content"
+            aria-required="true"
+          ></textarea>
+        </label>
+        <div class="comment-actions">
+          <button type="submit" class="btn primary" id="comment-submit" title="Submit">Submit</button>
+          <button type="button" class="btn secondary" id="comment-export" title="Export comments JSON">
+            Export comments JSON
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="settings-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h2 id="settings-title">Settings</h2>
+        <button class="btn" id="settings-close" type="button" aria-label="Close" title="Close">×</button>
+      </header>
+      <form id="settings-form" class="modal-body">
+        <label>
+          <span id="settings-rate-label">USD→CNY rate</span>
+          <input
+            type="number"
+            id="rate-input"
+            step="0.0001"
+            min="0"
+            placeholder="e.g. 7.00"
+            title="USD to CNY exchange rate"
+          />
+        </label>
+        <div class="modal-actions">
+          <button type="submit" class="btn primary" id="settings-save" title="Save">Save</button>
+          <button type="button" class="btn secondary" id="settings-reset" title="Reset">Reset</button>
+          <button type="button" class="btn secondary" id="settings-cancel" title="Close">Close</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="import-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h2 id="import-title">Test file import</h2>
+        <button class="btn" id="import-close" type="button" aria-label="Close" title="Close">×</button>
+      </header>
+      <div class="modal-body">
+        <p id="import-desc">Choose a CSV or XLSX file for local preview. Data stays in your browser.</p>
+        <input
+          type="file"
+          id="import-file"
+          accept=".csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          aria-describedby="import-desc"
+          title="Choose a CSV or XLSX file"
+        />
+        <div class="modal-actions">
+          <button class="btn primary" id="import-select" type="button" title="Choose file">Choose file</button>
+          <button class="btn secondary" id="import-cancel" type="button" title="Cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>Saved</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="app.js" charset="utf-8"></script>
+</body>
+</html>
